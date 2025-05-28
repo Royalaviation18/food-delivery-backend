@@ -13,7 +13,8 @@ app.use(express.json());
 
 app.use('/api/users', userRoutes);
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`User service running on port ${PORT}`);
+const PORT = Number(process.env.PORT) || 3001;
+const HOST = '0.0.0.0';
+app.listen(PORT, HOST, () => {
+  console.log(`User service running on http://${HOST}:${PORT}`);
 });
