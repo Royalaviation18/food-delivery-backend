@@ -1,15 +1,20 @@
-import { Router } from 'express';
-import { PrismaClient } from '@prisma/client';
-import axios from 'axios';
-const router = Router();
-const prisma = new PrismaClient();
+"use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const client_1 = require("@prisma/client");
+const axios_1 = __importDefault(require("axios"));
+const router = (0, express_1.Router)();
+const prisma = new client_1.PrismaClient();
 const RESTAURANT_SERVICE_URL = process.env.RESTAURANT_SERVICE_URL || 'http://localhost:3002';
 const ORDER_SERVICE_URL = process.env.ORDER_SERVICE_URL || 'http://localhost:3004'; // new: order-service base URL
 // Get all online restaurants available at the current hour (via restaurant-service)
 router.get('/restaurants', async (req, res) => {
     try {
         const currentHour = req.query.currentHour ? parseInt(req.query.currentHour) : new Date().getHours();
-        const response = await axios.get(`${RESTAURANT_SERVICE_URL}/api/restaurants?currentHour=${currentHour}`);
+        const response = await axios_1.default.get(`${RESTAURANT_SERVICE_URL}/api/restaurants?currentHour=${currentHour}`);
         res.json(response.data);
     }
     catch (error) {
@@ -21,7 +26,7 @@ router.get('/restaurants', async (req, res) => {
 router.post('/orders', async (req, res) => {
     try {
         // Forward the order request to order-service
-        const response = await axios.post(`${ORDER_SERVICE_URL}/api/orders`, req.body);
+        const response = await axios_1.default.post(`${ORDER_SERVICE_URL}/api/orders`, req.body);
         res.status(response.status).json(response.data);
     }
     catch (error) {
@@ -35,7 +40,7 @@ router.post('/orders', async (req, res) => {
 router.post('/orders/:id/rate', async (req, res) => {
     const orderId = req.params.id;
     try {
-        const response = await axios.post(`${ORDER_SERVICE_URL}/api/orders/${orderId}/rate`, req.body);
+        const response = await axios_1.default.post(`${ORDER_SERVICE_URL}/api/orders/${orderId}/rate`, req.body);
         res.status(response.status).json(response.data);
     }
     catch (error) {
@@ -49,7 +54,7 @@ router.post('/orders/:id/rate', async (req, res) => {
 router.get('/orders/:userId', async (req, res) => {
     const { userId } = req.params;
     try {
-        const response = await axios.get(`${ORDER_SERVICE_URL}/api/orders/${userId}`);
+        const response = await axios_1.default.get(`${ORDER_SERVICE_URL}/api/orders/${userId}`);
         res.json(response.data);
     }
     catch (error) {
@@ -117,7 +122,7 @@ router.get('/users/:id', async (req, res) => {
 router.get('/order/:orderId', async (req, res) => {
     const { orderId } = req.params;
     try {
-        const response = await axios.get(`${ORDER_SERVICE_URL}/api/order/${orderId}`);
+        const response = await axios_1.default.get(`${ORDER_SERVICE_URL}/api/order/${orderId}`);
         res.json(response.data);
     }
     catch (error) {
@@ -127,4 +132,4 @@ router.get('/order/:orderId', async (req, res) => {
         res.status(status).json({ error: message });
     }
 });
-export default router;
+exports.default = router;
