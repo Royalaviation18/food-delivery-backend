@@ -120,5 +120,31 @@ const getOrderById: RequestHandler = async (req, res) => {
 };
 router.get('/:id', getOrderById);
 
+// Generic update endpoint for orders (can update multiple fields)
+const updateOrder: RequestHandler = async (req, res) => {
+  const { id } = req.params;
+  const updateData = req.body;
+
+  try {
+    // Update the order with any fields passed in the request body
+    const updatedOrder = await prisma.order.update({
+      where: { id },
+      data: updateData,
+    });
+
+    res.status(200).json(updatedOrder);
+  } catch (error: any) {
+    console.error("❌ Error updating order:", error.message || error);
+    if (error.code === 'P2025') { // Prisma record not found error
+      res.status(404).json({ error: "Order not found" });
+    } else {
+      res.status(500).json({ error: "Internal server error" });
+    }
+  }
+};
+
+router.patch('/:id', updateOrder);
+
+
 
 export default router;

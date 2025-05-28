@@ -1,5 +1,6 @@
 import { Router, Request, Response, RequestHandler } from 'express';
 import { PrismaClient } from '@prisma/client';
+import axios from 'axios';
 
 const prisma = new PrismaClient();
 const router = Router();
@@ -41,7 +42,6 @@ router.get('/all', async (_req: Request, res: Response) => {
 export const getAgentById: RequestHandler = async (req, res) => {
   const { id } = req.params;
 
-  
   try {
     const agent = await prisma.deliveryAgent.findUnique({
       where: { id },
@@ -58,6 +58,7 @@ export const getAgentById: RequestHandler = async (req, res) => {
     res.status(500).json({ error: 'Internal server error' });
   }
 };
+
 /**
  * Assign an available delivery agent (safe transaction)
  * POST /agents/assign
@@ -111,9 +112,9 @@ router.post('/:id/available', async (req: Request, res: Response) => {
 
 /**
  * Create a new delivery agent
- * POST /agents
+ * POST /agents/create
  */
-router.post('/', async (req: Request, res: Response) => {
+router.post('/create', async (req: Request, res: Response) => {
   const { name, phoneNumber } = req.body;
 
   if (!name || !phoneNumber) {
@@ -136,5 +137,40 @@ router.post('/', async (req: Request, res: Response) => {
     res.status(500).json({ error: 'Error creating agent' });
   }
 });
+
+/**
+ * Update order status via order microservice
+ * PATCH /agents/:agentId/orders/:orderId/status
+ */
+export const updateOrderStatusByAgent: RequestHandler = async (req, res) => {
+  const { orderId } = req.params;
+  const { status } = req.body;
+
+  if (!status) {
+    res.status(400).json({ error: 'Missing status in request body' });
+    return;
+  }
+
+  try {
+    // Replace with your actual order service URL
+    const orderServiceUrl = process.env.ORDER_SERVICE_URL || 'http://localhost:3004/api/orders';
+
+    // Call the order microservice's update order status endpoint
+    const response = await axios.patch(`${orderServiceUrl}/${orderId}/status`, { status });
+
+    // Forward the response from order service to the client
+    res.status(response.status).json(response.data);
+  } catch (error: any) {
+    console.error('❌ Error updating order status via order service:', error.message || error);
+
+    if (error.response) {
+      // Forward the error response from order service
+      res.status(error.response.status).json(error.response.data);
+    } else {
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  }
+};
+router.patch('/:agentId/orders/:orderId/status', updateOrderStatusByAgent);
 
 export default router;

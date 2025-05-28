@@ -1,4 +1,4 @@
-import { Router, RequestHandler, Request, Response } from 'express';
+import { Router, Request, Response, RequestHandler } from 'express';
 import { PrismaClient } from '@prisma/client';
 import axios from 'axios';
 
@@ -24,7 +24,6 @@ interface Order {
   id: string;
   restaurantId: string;
   status: string;
-  // add other fields as necessary
 }
 
 // GET /api/restaurants?currentHour=XX
@@ -65,15 +64,36 @@ router.post('/', async (req: Request, res: Response) => {
   }
 });
 
+// PUT /api/restaurants/:id
+router.put('/:id', async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const { name, isOnline, openingHour, closingHour } = req.body;
+
+  try {
+    const updatedRestaurant = await prisma.restaurant.update({
+      where: { id },
+      data: {
+        ...(name && { name }),
+        ...(typeof isOnline === 'boolean' && { isOnline }),
+        ...(openingHour !== undefined && { openingHour }),
+        ...(closingHour !== undefined && { closingHour }),
+      },
+    });
+
+    res.json(updatedRestaurant);
+  } catch (error) {
+    console.error('Error updating restaurant:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // POST /api/restaurants/orders/:orderId/accept
-const acceptOrder: RequestHandler = async (req, res) => {
+export const acceptOrder: RequestHandler = async (req, res) => {
   const { orderId } = req.params;
 
   try {
-    // Fetch order details from order-service
     const orderResponse = await axios.get<Order>(`${ORDER_SERVICE_BASE_URL}/${orderId}`);
     const order = orderResponse.data;
-
     if (!order) {
       res.status(404).json({ error: 'Order not found' });
       return;
@@ -84,16 +104,14 @@ const acceptOrder: RequestHandler = async (req, res) => {
       return;
     }
 
-    // Assign a delivery agent via delivery-agent-service
     const agentResponse = await axios.post<AssignedAgentResponse>(DELIVERY_AGENT_SERVICE_URL);
     const assignedAgent = agentResponse.data.assignedAgent;
 
-    if (!assignedAgent || !assignedAgent.id) {
+    if (!assignedAgent?.id) {
       res.status(400).json({ error: 'No delivery agents available' });
       return;
     }
 
-    // Update order status and assign delivery agent in order-service
     const updatedOrderResponse = await axios.patch(`${ORDER_SERVICE_BASE_URL}/${orderId}`, {
       status: 'accepted',
       deliveryAgentId: assignedAgent.id,
@@ -105,11 +123,71 @@ const acceptOrder: RequestHandler = async (req, res) => {
       assignedAgent,
     });
   } catch (error: any) {
-    console.error('Error accepting order:', error.message || error);
+    console.error('❌ Error accepting order:', error.message || error);
     res.status(500).json({ error: 'Internal server error' });
   }
 };
-
 router.post('/orders/:orderId/accept', acceptOrder);
+
+
+// POST /api/restaurants/:restaurantId/menu
+router.post('/:restaurantId/menu', async (req: Request, res: Response) => {
+  const { restaurantId } = req.params;
+  const { name, price, available } = req.body;
+
+  try {
+    const menuItem = await prisma.menuItem.create({
+      data: {
+        name,
+        price,
+        available,
+        restaurantId,
+      },
+    });
+
+    res.status(201).json(menuItem);
+  } catch (error) {
+    console.error('Error adding menu item:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// PUT /api/restaurants/menu/:menuItemId
+router.put('/menu/:menuItemId', async (req: Request, res: Response) => {
+  const { menuItemId } = req.params;
+  const { name, price, available } = req.body;
+
+  try {
+    const updatedMenuItem = await prisma.menuItem.update({
+      where: { id: menuItemId },
+      data: {
+        ...(name && { name }),
+        ...(price !== undefined && { price }),
+        ...(available !== undefined && { available }),
+      },
+    });
+
+    res.json(updatedMenuItem);
+  } catch (error) {
+    console.error('Error updating menu item:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// DELETE /api/restaurants/menu/:menuItemId
+router.delete('/menu/:menuItemId', async (req: Request, res: Response) => {
+  const { menuItemId } = req.params;
+
+  try {
+    await prisma.menuItem.delete({
+      where: { id: menuItemId },
+    });
+
+    res.status(204).send();
+  } catch (error) {
+    console.error('Error deleting menu item:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
 
 export default router;

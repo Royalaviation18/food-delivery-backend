@@ -6,6 +6,7 @@ const router = Router();
 const prisma = new PrismaClient();
 
 const RESTAURANT_SERVICE_URL = process.env.RESTAURANT_SERVICE_URL || 'http://localhost:3002';
+const ORDER_SERVICE_URL = process.env.ORDER_SERVICE_URL || 'http://localhost:3004'; // new: order-service base URL
 
 // Types
 interface OrderRequestBody {
@@ -31,80 +32,45 @@ router.get('/restaurants', async (req: Request, res: Response) => {
   }
 });
 
-// Place an order only if restaurant is online and open
+// Place an order via order-service
 router.post('/orders', async (req: Request<{}, {}, OrderRequestBody>, res: Response) => {
-  const { userId, restaurantId, items } = req.body;
-
-  if (!userId || !restaurantId || !Array.isArray(items) || items.length === 0) {
-    return res.status(400).json({ error: 'Missing or invalid order data' });
-  }
-
   try {
-    const currentHour = new Date().getHours();
-    const restaurantResponse = await axios.get(`${RESTAURANT_SERVICE_URL}/api/restaurants?currentHour=${currentHour}`);
-    const availableRestaurants = restaurantResponse.data as {id: string}[];
-
-    const isRestaurantAvailable = availableRestaurants.some((r: any) => r.id === restaurantId);
-
-    if (!isRestaurantAvailable) {
-      return res.status(400).json({ error: 'Restaurant is not available at this hour' });
-    }
-
-    const order = await prisma.order.create({
-      data: {
-        userId,
-        restaurantId,
-        items,
-        status: 'PLACED',
-      },
-    });
-
-    res.status(201).json(order);
+    // Forward the order request to order-service
+    const response = await axios.post(`${ORDER_SERVICE_URL}/api/orders`, req.body);
+    res.status(response.status).json(response.data);
   } catch (error: any) {
-    console.error('Error placing order:', error.message || error);
-    res.status(500).json({ error: 'Internal server error' });
+    console.error('Error placing order via order-service:', error.response?.data || error.message || error);
+    const status = error.response?.status || 500;
+    const message = error.response?.data?.error || 'Internal server error';
+    res.status(status).json({ error: message });
   }
 });
 
-// Rate an order and agent
+// Rate an order via order-service
 router.post('/orders/:id/rate', async (req: Request<{ id: string }, {}, RateRequestBody>, res: Response) => {
   const orderId = req.params.id;
-  const { userRating, agentRating } = req.body;
-
-  if (userRating == null || agentRating == null) {
-    return res.status(400).json({ error: 'Both ratings are required' });
-  }
-
   try {
-    const updated = await prisma.order.update({
-      where: { id: orderId },
-      data: {
-        userRating,
-        agentRating,
-      },
-    });
-
-    res.json(updated);
+    const response = await axios.post(`${ORDER_SERVICE_URL}/api/orders/${orderId}/rate`, req.body);
+    res.status(response.status).json(response.data);
   } catch (error: any) {
-    console.error('Error rating order:', error.message || error);
-    res.status(500).json({ error: 'Internal server error' });
+    console.error('Error rating order via order-service:', error.response?.data || error.message || error);
+    const status = error.response?.status || 500;
+    const message = error.response?.data?.error || 'Internal server error';
+    res.status(status).json({ error: message });
   }
 });
 
-// Fetch a user's order history
+// Fetch a user's order history via order-service
 router.get('/orders/:userId', async (req: Request<{ userId: string }>, res: Response) => {
   const { userId } = req.params;
-
   try {
-    const orders = await prisma.order.findMany({
-      where: { userId },
-      orderBy: { createdAt: 'desc' },
-    });
-
-    res.json(orders);
+    const response = await axios.get(`${ORDER_SERVICE_URL}/api/orders/${userId}`);
+    res.json(response.data);
   } catch (error: any) {
-    console.error('Error fetching user orders:', error.message || error);
-    res.status(500).json({ error: 'Failed to fetch orders' });
+    console.error('Error fetching user orders via order-service:', error.response?.data || error.message || error);
+    const status = error.response?.status || 500;
+    const message = error.response?.data?.error || 'Failed to fetch orders';
+    res.status(status).json({ error: message });
   }
 });
 
@@ -170,23 +136,17 @@ router.get('/users/:id', async (req: Request<{ id: string }>, res: Response) => 
   }
 });
 
-// Get order by ID
+// Get order by ID via order-service
 router.get('/order/:orderId', async (req: Request<{ orderId: string }>, res: Response) => {
   const { orderId } = req.params;
-
   try {
-    const order = await prisma.order.findUnique({
-      where: { id: orderId },
-    });
-
-    if (!order) {
-      return res.status(404).json({ error: 'Order not found' });
-    }
-
-    res.json(order);
+    const response = await axios.get(`${ORDER_SERVICE_URL}/api/order/${orderId}`);
+    res.json(response.data);
   } catch (error: any) {
-    console.error('Error fetching order:', error.message || error);
-    res.status(500).json({ error: 'Failed to fetch order' });
+    console.error('Error fetching order via order-service:', error.response?.data || error.message || error);
+    const status = error.response?.status || 500;
+    const message = error.response?.data?.error || 'Failed to fetch order';
+    res.status(status).json({ error: message });
   }
 });
 
