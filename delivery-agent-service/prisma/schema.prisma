@@ -1,0 +1,16 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql" // <-- CHANGE THIS LINE
+  url      = env("DATABASE_URL")
+}
+
+model DeliveryAgent {
+  id          String   @id @default(uuid())
+  name        String
+  phoneNumber String   @unique
+  isAvailable Boolean  @default(true)
+  createdAt   DateTime @default(now())
+}
